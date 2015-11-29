@@ -2,7 +2,7 @@
 card: A dictionary mapping cue to target.
 The terms cue and target are used and the mode of learning is called cued-recall
 
-More specifically for, our flash card algorithm being used for vocabulary learning.
+More specifically when our flash card algorithm is being used for vocabulary learning:
 - cue is the  word
 - target is the meaning of the word
 """
@@ -90,7 +90,7 @@ def weighted_combination(weights, distributions):
     for cue in cues:
         weighted_sum = 0
         for i in range(ndist):
-            weighted_sum += weights[i] * distributions[i][cue]
+            weighted_sum += (weights[i] * distributions[i][cue])
         newd[cue] = weighted_sum
 
     return newd
@@ -107,8 +107,12 @@ class FlashcardAlgorithm():
     # Stores front side to back side hash map
     card = {}                       # cue-target dictionary
     last_draw_timestamp = {}        # cue-lastshown timestamp dictionary
+    ncards_drawn = 0                # Count of total number of cards drawn
 
-    def __init__(self, learning_rate=10, data_file='data/cards.txt'):
+    #drawn_count = {}          # Dictionary: For each card stores number of times that card was drawn
+    unknown_count = {}         # Dictionary: Number of times each card was marked as unknown (0) by learner
+
+    def __init__(self, learning_rate=4, data_file='data/cards.txt'):
         """
         Initialize the adaptive flash card algorithm
         """
@@ -123,8 +127,10 @@ class FlashcardAlgorithm():
         for l in lines:
             cue, target = l.split('#')
             cue, target = cue.strip(), target.strip()
-            self.strength[cue] = 1/len(lines)
             self.card[cue] = target
+
+            self.strength[cue] = 1/len(lines)
+            self.unknown_count[cue] = 0
 
         # Initialize last_draw_timestamp to current time for all cards
         #XXX: Ideally these should be stored into a database or pickled to a file and reused at each restart
@@ -134,13 +140,21 @@ class FlashcardAlgorithm():
 
         self.state = 'WAIT_DRAW_CARD'
 
+
+    def get_tdist(self):
+        """
+        Returns distribution dictionary of telapsed
+        """
+        telapsed = get_telapsed(self.last_draw_timestamp)
+        tdist = softmax_norm(telapsed)              # Time elapsed distribution
+        return tdist
+
     def draw_card(self):
         """
         Returns next card (just the cue is returned)
         card[cue] can be used to get the target
         """
-        telapsed = get_telapsed(self.last_draw_timestamp)
-        tdist = softmax_norm(telapsed)                              # Time elapsed distribution
+        tdist = self.get_tdist()
 
         #E_recall = get_expectation_of_recall(telapsed, self.strength)  # This dict indicates relative strength of recall of each card
                                                                     # Note: recall relative strength is different from strength
@@ -151,9 +165,10 @@ class FlashcardAlgorithm():
         self.draw_dist = weighted_combination([1,0], [self.strength, tdist])
 
         # Draw a card from the distribution
-        cue = weighted_pick(self.strength)               # Draw distribution should be updated as per the new times just before drawing a new card
+        cue = weighted_pick(self.draw_dist)               # Draw distribution should be updated as per the new times just before drawing a new card
         self.last_draw_timestamp[cue] = datetime.now()    # Update last shown time of card drawn to current time
 
+        self.ncards_drawn += 1
         return cue
 
 
@@ -166,11 +181,12 @@ class FlashcardAlgorithm():
             # Learner knows card, increase the strength
             self.strength[cue] = self.strength[cue] / self.learning_rate
         else:
+            self.unknown_count[cue] += 1
             # Learner does not know a card, reduce the strength
             self.strength[cue] = self.strength[cue] * self.learning_rate
 
         # Normalize all weights (Perhaps use softmax for normalizing)
         self.strength = softmax_norm(self.strength)
 
-        pprint(self.strength)
+        #pprint(self.strength)
         return True

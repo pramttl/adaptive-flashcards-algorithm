@@ -1,7 +1,8 @@
 from api import *
 
+algo = FlashcardAlgorithm()
+
 while True:
-    algo = FlashcardAlgorithm()
     cue = algo.draw_card()
     print cue
 
