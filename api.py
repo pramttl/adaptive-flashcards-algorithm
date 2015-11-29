@@ -75,12 +75,26 @@ def get_expectation_of_recall(tdist, strength):
     return E_recall
 
 
-STATES = [
-          'WAIT_INIT', 
-          'WAIT_DRAW_CARD',
-          'WAIT_REPLY',
-          'END',
-          ]
+def weighted_combination(weights, distributions):
+    """
+    Returns a new distribution which is weighted combination of input distributions.
+    weight0 corresponds to distribution0, weight1 to distribution1 and so on ...
+    """
+    assert sum(weights) == float(1)
+
+    newd = {}
+    ndist = len(distributions)
+
+    cues = distributions[0].keys()
+
+    for cue in cues:
+        weighted_sum = 0
+        for i in range(ndist):
+            weighted_sum += weights[i] * distributions[i][cue]
+        newd[cue] = weighted_sum
+
+    return newd
+
 
 class FlashcardAlgorithm():
 
@@ -93,9 +107,6 @@ class FlashcardAlgorithm():
     # Stores front side to back side hash map
     card = {}                       # cue-target dictionary
     last_draw_timestamp = {}        # cue-lastshown timestamp dictionary
-
-    state = 'WAIT_INIT'
-    drawn_card_cue = None
 
     def __init__(self, learning_rate=10, data_file='data/cards.txt'):
         """
@@ -128,21 +139,20 @@ class FlashcardAlgorithm():
         Returns next card (just the cue is returned)
         card[cue] can be used to get the target
         """
-        assert self.state == 'WAIT_DRAW_CARD'
         telapsed = get_telapsed(self.last_draw_timestamp)
         tdist = softmax_norm(telapsed)                              # Time elapsed distribution
-        E_recall = get_expectation_of_recall(tdist, self.strength)  # This dict indicates relative strength of recall of each card
+
+        #E_recall = get_expectation_of_recall(telapsed, self.strength)  # This dict indicates relative strength of recall of each card
                                                                     # Note: recall relative strength is different from strength
                                                                     # It also depends on number of seconds elapsed since card was last shown
         
-        E_notrecall = complementary_dict(E_recall)                  # Relative strength of not-recalling a word
-        self.draw_dist = softmax_norm(E_notrecall)
+        #E_notrecall = complementary_dict(E_recall)                  # Relative strength of not-recalling a word
+
+        self.draw_dist = weighted_combination([1,0], [self.strength, tdist])
 
         # Draw a card from the distribution
-        cue = weighted_pick(self.draw_dist)               # Draw distribution should be updated as per the new times just before drawing a new card
+        cue = weighted_pick(self.strength)               # Draw distribution should be updated as per the new times just before drawing a new card
         self.last_draw_timestamp[cue] = datetime.now()    # Update last shown time of card drawn to current time
-
-        self.state = 'WAIT_REPLY'
 
         return cue
 
@@ -152,18 +162,15 @@ class FlashcardAlgorithm():
         Reply from the human learner, whether he knows the card or not.
         1 if learner knows card, 0 if it doesn't (Binary feedback)
         """
-        assert self.state == 'WAIT_REPLY'
-
         if resp == 1:
             # Learner knows card, increase the strength
-            self.strength[cue] = self.strength[cue] * self.learning_rate
+            self.strength[cue] = self.strength[cue] / self.learning_rate
         else:
             # Learner does not know a card, reduce the strength
-            self.strength[cue] = self.strength[cue] / self.learning_rate
+            self.strength[cue] = self.strength[cue] * self.learning_rate
 
         # Normalize all weights (Perhaps use softmax for normalizing)
         self.strength = softmax_norm(self.strength)
 
-        self.state = 'WAIT_DRAW_CARD'
-
+        pprint(self.strength)
         return True
