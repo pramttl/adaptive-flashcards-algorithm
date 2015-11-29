@@ -13,10 +13,10 @@ for t in xrange(1000):
     else:
         algo.reply(cue, 1)
 
-#pprint(cards_shown)
+pprint(cards_shown)
 mle_estimate = float(cards_shown.count('consternation'))/len(cards_shown)
 
 print "------------------------------------------"
 print "consternation_mle_estimate", mle_estimate
 pprint(algo.draw_dist)
-pprint(algo.strength)
+#pprint(algo.strength)
