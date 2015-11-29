@@ -14,6 +14,16 @@ import numpy as np
 from datetime import datetime
 from pprint import pprint
 
+def simple_norm(D):
+    """
+    Divide by sum norm
+    """
+    newd = {}
+    S = sum(D.values())
+    for c in D.keys():
+        newd[c] = float(D[c])/S
+    return newd
+
 def softmax_norm(D):
     """
     Normalize using softmax function
@@ -80,8 +90,8 @@ def weighted_combination(weights, distributions):
     Returns a new distribution which is weighted combination of input distributions.
     weight0 corresponds to distribution0, weight1 to distribution1 and so on ...
     """
-    assert sum(weights) == float(1)
 
+    sum_weights = sum(weights)
     newd = {}
     ndist = len(distributions)
 
@@ -91,7 +101,7 @@ def weighted_combination(weights, distributions):
         weighted_sum = 0
         for i in range(ndist):
             weighted_sum += (weights[i] * distributions[i][cue])
-        newd[cue] = weighted_sum
+        newd[cue] = weighted_sum / sum_weights
 
     return newd
 
@@ -104,6 +114,7 @@ def mle_dist(ncards_drawn, card_count):
     dist = {}
     for cue in card_count.keys():
         dist[cue] = float(card_count[cue])/ ncards_drawn
+    dist = simple_norm(dist)
     return dist
 
 def laplace_smoothing_dist(ncards_drawn, card_count):
@@ -117,6 +128,7 @@ def laplace_smoothing_dist(ncards_drawn, card_count):
     nwords = len(cues)
     for cue in cues:
         dist[cue] = (float(card_count[cue]) + 1)/ (ncards_drawn + nwords)
+    dist = simple_norm(dist)
     return dist
 
 class FlashcardAlgorithm():
@@ -135,13 +147,19 @@ class FlashcardAlgorithm():
 
     known_count = {}           # Dictionary: Number of times each card was marked as known (1) by learner
     unknown_count = {}         # Dictionary: Number of times each card was marked as unknown (0) by learner
+    wdist_weight = None
+    tdist_weight = None
 
-    def __init__(self, learning_rate=4, data_file='data/cards.txt'):
+    def __init__(self, wdist_weight=1, tdist_weight=0, data_file='data/cards.txt'):
         """
         Initialize the adaptive flash card algorithm
+        :wdist_weight: Importance given to weakness distribution
+        :tdsit_weight: Importane given to time distribution
         """
 
-        self.learning_rate = learning_rate
+        # Initializing the distirbution weights
+        self.wdist_weight = wdist_weight
+        self.tdist_weight = tdist_weight
 
         # Loading the card dictionary from a data files
         f = open(data_file)
@@ -162,9 +180,6 @@ class FlashcardAlgorithm():
         now = datetime.now()
         for cue in self.card.keys():
             self.last_draw_timestamp[cue] = now
-
-        self.state = 'WAIT_DRAW_CARD'
-
 
     def get_tdist(self):
         """
@@ -187,8 +202,8 @@ class FlashcardAlgorithm():
         
         #E_notrecall = complementary_dict(E_recall)                  # Relative strength of not-recalling a word
 
-        #self.draw_dist = weighted_combination([0.9,0.1], [self.weakness, tdist])
-        self.draw_dist = self.weakness
+        self.draw_dist = weighted_combination([self.wdist_weight, self.tdist_weight], [self.weakness, tdist])
+        #self.draw_dist = self.weakness
 
         # Draw a card from the distribution
         cue = weighted_pick(self.draw_dist)               # Draw distribution should be updated as per the new times just before drawing a new card
@@ -210,13 +225,12 @@ class FlashcardAlgorithm():
             # Learner does not know a card, reduce the strength (Old method, deprecated and commented out)
             # self.strength[cue] = self.strength[cue] / self.learning_rate
 
-        print "================"
         print cue
-        pprint(self.weakness)
-        pprint(self.known_count)
-        pprint(self.unknown_count)
-        pprint(self.ncards_drawn)
-        print "----------------"
+        #pprint(self.weakness)
+        #print(self.known_count)
+        #pprint(self.unknown_count)
+        #pprint(self.ncards_drawn)
+        #print "----------------"
         self.strength = laplace_smoothing_dist(self.ncards_drawn, self.known_count)
         self.weakness = laplace_smoothing_dist(self.ncards_drawn, self.unknown_count)
 

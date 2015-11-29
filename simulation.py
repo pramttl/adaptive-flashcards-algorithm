@@ -2,7 +2,7 @@ from api import *
 from pprint import pprint
 
 cards_shown = []
-algo = FlashcardAlgorithm()
+algo = FlashcardAlgorithm(1, 0)     # 1st param is weight to weakness dist, and 2nd param is weight to time dist
 
 for t in xrange(1000):
     cue = algo.draw_card()
@@ -19,4 +19,4 @@ mle_estimate = float(cards_shown.count('consternation'))/len(cards_shown)
 print "------------------------------------------"
 print "consternation_mle_estimate", mle_estimate
 pprint(algo.draw_dist)
-#pprint(algo.strength)
+pprint(algo.weakness)
