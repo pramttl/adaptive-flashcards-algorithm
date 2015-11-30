@@ -20,8 +20,15 @@ def simple_norm(D):
     """
     newd = {}
     S = sum(D.values())
-    for c in D.keys():
-        newd[c] = float(D[c])/S
+    N = len(D.keys())
+
+    if S == 0:
+        # If all values in the distribution are 0
+        for c in D.keys():
+            newd[c] = float(1)/N
+    else:
+        for c in D.keys():
+            newd[c] = float(D[c])/S
     return newd
 
 def softmax_norm(D):
@@ -58,7 +65,7 @@ def get_telapsed(last_draw_timestamp):
     telapsed = {}
     now = datetime.now()
     for cue, tstamp in last_draw_timestamp.items():
-        telapsed[cue] = (now - tstamp).seconds        #XXX: Not sure if we should make this microseconds
+        telapsed[cue] = (now - tstamp).microseconds        #XXX: Not sure if we should make this microseconds
     return telapsed
 
 
@@ -150,7 +157,7 @@ class FlashcardAlgorithm():
     wdist_weight = None
     tdist_weight = None
 
-    def __init__(self, wdist_weight=1, tdist_weight=0, data_file='data/cards.txt'):
+    def __init__(self, wdist_weight=1, tdist_weight=0, data_file='data/sample_cards.txt'):
         """
         Initialize the adaptive flash card algorithm
         :wdist_weight: Importance given to weakness distribution
@@ -186,7 +193,7 @@ class FlashcardAlgorithm():
         Returns distribution dictionary of telapsed
         """
         telapsed = get_telapsed(self.last_draw_timestamp)
-        tdist = softmax_norm(telapsed)              # Time elapsed distribution
+        tdist = simple_norm(telapsed)              # Time elapsed distribution
         return tdist
 
     def draw_card(self):
@@ -225,7 +232,7 @@ class FlashcardAlgorithm():
             # Learner does not know a card, reduce the strength (Old method, deprecated and commented out)
             # self.strength[cue] = self.strength[cue] / self.learning_rate
 
-        print cue
+        #print cue
         #pprint(self.weakness)
         #print(self.known_count)
         #pprint(self.unknown_count)
